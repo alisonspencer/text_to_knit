@@ -159,7 +159,7 @@ def divide_original_text(text: str, grouping_size: int=10):
 
 
 
-class BibliophileKnittingPattern:
+class Bibliophile:
     def __init__(self, 
                  text: str, 
                  stitches_per_block: int=10, 
