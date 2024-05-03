@@ -275,7 +275,7 @@ class BibliophileKnittingPattern:
         punctuation_mapping = self.punctuation_mapping if punctuation_mapping is None else punctuation_mapping
         treat_zero_as_punctuation = self.treat_zero_as_punctuation if treat_zero_as_punctuation is None else treat_zero_as_punctuation
         
-        pattern = text_to_knitting(self.stitches, 
+        pattern = text_to_knitting(self.text, 
                                    stitches_per_block=stitches_per_block, 
                                    blocks_per_line=blocks_per_line, 
                                    max_purl_run_len=max_purl_run_len, 
@@ -311,7 +311,7 @@ class BibliophileKnittingPattern:
                                         )
         return pattern
         
-    def get_T_sequences(self, 
+    def get_next_T_sequences(self, 
                         stitch_counts: List[int], 
                         start_row_num: int=1, 
                         count_rows_by: int=2, 
@@ -322,7 +322,8 @@ class BibliophileKnittingPattern:
                         ):
         
         """
-        Generate the next series of 'T' sequences in the pattern, given the expected stitch counts
+        Generate the next series of 'T' sequences in the pattern, given the expected stitch counts. 
+        The starting stitch (word) will automatically be advanced each time this function is called based on the last used index (stitch). 
         
         Args:
             stitch_counts (List[int]): List of stitch counts for each sequence
@@ -346,9 +347,9 @@ class BibliophileKnittingPattern:
             
             pattern.append('\nT' + str(seq_num+1) + ': (' + str(stitch_counts[i]) + ') \n')
             pattern.append(self.get_next_n_stitches(n_stitches=stitch_counts[i], 
-                                                  single_line=single_line, 
-                                                  stitches_per_block=stitches_per_block, blocks_per_line=blocks_per_line
-                                                  ))
+                                                    single_line=single_line, 
+                                                    stitches_per_block=stitches_per_block, blocks_per_line=blocks_per_line
+                                                    ))
             pattern.append('\n')
             seq_num += 1    
             
