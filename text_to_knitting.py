@@ -146,6 +146,7 @@ def text_to_knitting(text: str,
                                 )
         
     pattern = make_readable_pattern(stitches, 
+                                    single_line=single_line,
                                     block_size=stitches_per_block, 
                                     blocks_in_line=blocks_per_line
                                     )
@@ -202,7 +203,6 @@ class Bibliophile:
                                         treat_zero_as_punctuation=treat_zero_as_punctuation
                                         )
         
-        self.pattern_rows = break_sequence(self.stitches, stitches_per_block*blocks_per_line)
         
     def __str__(self):
         return self.pattern
@@ -217,16 +217,16 @@ class Bibliophile:
         return len(self.stitches)
     
     def __iter__(self):
-        return iter(self.pattern_rows)
+        return iter(self.stitches)
     
     def __next__(self):
-        return next(self.pattern_rows)
+        return next(self.stitches)
     
     def __call__(self, index):
-        return self.pattern_rows[index]
+        return self.stitches[index]
     
     def get_stitches_at_index(self, start, end, single_line=True):
-        return self.get_next_n_stitches(end-start, single_line=single_line)
+        return make_readable_pattern(self.stitches[start:end], single_line=single_line)
     
     def get_next_block_row(self):
         return next(self.pattern_rows)
@@ -234,6 +234,15 @@ class Bibliophile:
     def reset_index(self):
         self.current_index = 0
         
+    def set_index(self, index):
+        self.current_index = index
+        
+    def get_index(self):
+        return self.current_index
+        
+    def get_called_stitch_counts(self):
+        return self.called_stitch_counts
+            
     def reset_called_stitch_counts(self):
         self.called_stitch_counts = []
         
