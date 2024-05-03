@@ -76,8 +76,8 @@ def consolidate_sequences(sequences: List[str]):
         
     return '\n'.join(pattern)
 
-def break_sequence(sequence: str, group_size): 
-    return [sequence[i:i+group_size] for i in range(0, len(sequence), group_size)]
+def break_sequence(sequence: str, grouping_size: int=10): 
+    return [sequence[i:i+grouping_size] for i in range(0, len(sequence), grouping_size)]
 
 # itertools version; only avalaible in python 3.10 or later 
 # def make_readable_pattern(sequence: str, block_size: int=10, blocks_in_line: int=3): 
@@ -87,7 +87,7 @@ def break_sequence(sequence: str, group_size):
     
 #     return '\n'.join(lines)
 
-def make_readable_pattern(sequence: str, block_size: int=10, blocks_in_line: int=1): 
+def make_readable_pattern(sequence: str, block_size: int=10, blocks_in_line: int=3): 
 
     blocks = [consolidate_sequence_into_pattern(b) for b in break_sequence(sequence, block_size)]
 
@@ -98,9 +98,30 @@ def make_readable_pattern(sequence: str, block_size: int=10, blocks_in_line: int
     
     return '\n'.join(lines)
 
+def get_cleaned_stitch_sequence(text: str, 
+                                max_purl_run_len: int=12, 
+                                max_knit_run_len: int=2, 
+                                purl_run_spacer_char: str='k', 
+                                punctuation_mapping: int=2, 
+                                treat_zero_as_punctuation: bool=True
+                                ):
+                
+    stitches = text_to_stitches(text, 
+                                punc_spaces=punctuation_mapping, 
+                                zero_as_punctuation=treat_zero_as_punctuation
+                                )
+    
+    stitches = fix_long_repeats(stitches, 
+                                max_purl_run_len=max_purl_run_len, 
+                                max_knit_run_len=max_knit_run_len,
+                                purl_run_spacer_char=purl_run_spacer_char
+                                )
+    
+    return stitches
+
 def text_to_knitting(text: str, 
                      stitches_per_block: int=10, 
-                     blocks_per_line: int=1,
+                     blocks_per_line: int=3,
                      max_purl_run_len: int=12, 
                      max_knit_run_len: int=2, 
                      purl_run_spacer_char: str='k', 
@@ -131,6 +152,125 @@ def divide_original_text(text: str, grouping_size: int=10):
     return '\n'.join([text[i:i+grouping_size] for i in range(0, len(text), grouping_size)]).strip()
 
 
+
+
+class BibliophileKnittingPattern:
+    def __init__(self, 
+                 text: str, 
+                 stitches_per_block: int=10, 
+                 blocks_per_line: int=1,
+                 max_purl_run_len: int=12, 
+                 max_knit_run_len: int=2, 
+                 purl_run_spacer_char: str='k', 
+                 punctuation_mapping: int=2, 
+                 treat_zero_as_punctuation: bool=True
+                 ):
+        
+        self.text = text
+        self.stitches_per_block = stitches_per_block
+        self.blocks_per_line = blocks_per_line
+        self.max_purl_run_len = max_purl_run_len
+        self.max_knit_run_len = max_knit_run_len
+        self.purl_run_spacer_char = purl_run_spacer_char
+        self.punctuation_mapping = punctuation_mapping
+        self.treat_zero_as_punctuation = treat_zero_as_punctuation
+        
+        self.current_index = 0
+        
+        self.called_stitch_counts = []
+        
+        self.stitches = get_cleaned_stitch_sequence(text, 
+                                                   max_purl_run_len=max_purl_run_len, 
+                                                   max_knit_run_len=max_knit_run_len, 
+                                                   purl_run_spacer_char=purl_run_spacer_char, 
+                                                   punctuation_mapping=punctuation_mapping, 
+                                                   treat_zero_as_punctuation=treat_zero_as_punctuation
+                                                   )
+        
+        self.pattern = text_to_knitting(text, 
+                                        stitches_per_block=stitches_per_block, 
+                                        blocks_per_line=blocks_per_line, 
+                                        max_purl_run_len=max_purl_run_len, 
+                                        max_knit_run_len=max_knit_run_len, 
+                                        purl_run_spacer_char=purl_run_spacer_char, 
+                                        punctuation_mapping=punctuation_mapping, 
+                                        treat_zero_as_punctuation=treat_zero_as_punctuation
+                                        )
+        
+        self.pattern_rows = break_sequence(self.stitches, stitches_per_block*blocks_per_line)
+        
+    def __str__(self):
+        return self.pattern
+    
+    def __repr__(self):
+        return self.pattern
+    
+    def __getitem__(self, index):
+        return self.pattern[index]
+    
+    def __len__(self):
+        return len(self.stitches)
+    
+    def __iter__(self):
+        return iter(self.pattern_rows)
+    
+    def __next__(self):
+        return next(self.pattern_rows)
+    
+    def __call__(self, index):
+        return self.pattern_rows[index]
+    
+    def get_next_block_row(self):
+        return next(self.pattern_rows)
+    
+    def reset_index(self):
+        self.current_index = 0
+        
+    def reset_called_stitch_counts(self):
+        self.called_stitch_counts = []
+    
+    def get_next_stitches(self, n_stitches: int, stitches_per_block=None, blocks_per_line=None):
+        
+        if stitches_per_block is None:
+            stitches_per_block = self.stitches_per_block
+        if blocks_per_line is None:
+            blocks_per_line = self.blocks_per_line
+        
+        working_row = self.stitches[self.current_index:self.current_index+n_stitches]
+        self.current_index += n_stitches
+        self.called_stitch_counts.append(n_stitches)
+        
+        pattern = make_readable_pattern(working_row, 
+                                        block_size=stitches_per_block, 
+                                        blocks_in_line=blocks_per_line
+                                        )
+        return pattern
+        
+    def get_next_several_sequences(self, 
+                                   stitch_counts: List[int], 
+                                   start_row_num: int=1, 
+                                   count_rows_by: int=2, 
+                                   seq_per_row: int=1
+                                   ):
+        
+        pattern = []
+        seq_num = 0
+        
+        for i in range(len(stitch_counts)):
+            if seq_num % seq_per_row == 0:
+                pattern.append('\n----- \nROW ' + str(start_row_num) + '\n')
+                start_row_num += count_rows_by
+                seq_num = 0
+            
+            pattern.append('\nT' + str(seq_num+1) + ': (' + str(stitch_counts[i]) + ') \n')
+            pattern.append(self.get_next_stitches(n_stitches=stitch_counts[i]))
+            pattern.append('\n')
+            seq_num += 1    
+            
+        return ''.join(pattern)
+    
+    
+    
 if __name__ == '__main__':
     
     argparser = argparse.ArgumentParser(description='Convert text to knitting pattern')
