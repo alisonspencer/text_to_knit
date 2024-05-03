@@ -87,8 +87,12 @@ def break_sequence(sequence: str, grouping_size: int=10):
     
 #     return '\n'.join(lines)
 
-def make_readable_pattern(sequence: str, block_size: int=10, blocks_in_line: int=3): 
-
+def make_readable_pattern(sequence: str, single_line:bool = False, block_size: int=10, blocks_in_line: int=3): 
+    
+    if single_line:
+        block_size = len(sequence)
+        blocks_in_line = 1
+            
     blocks = [consolidate_sequence_into_pattern(b) for b in break_sequence(sequence, block_size)]
 
     lines = []
@@ -120,6 +124,7 @@ def get_cleaned_stitch_sequence(text: str,
     return stitches
 
 def text_to_knitting(text: str, 
+                     single_line: bool=False,
                      stitches_per_block: int=10, 
                      blocks_per_line: int=3,
                      max_purl_run_len: int=12, 
@@ -220,6 +225,9 @@ class BibliophileKnittingPattern:
     def __call__(self, index):
         return self.pattern_rows[index]
     
+    def get_stitches_at_index(self, start, end, single_line=True):
+        return self.get_next_n_stitches(end-start, single_line=single_line)
+    
     def get_next_block_row(self):
         return next(self.pattern_rows)
     
@@ -228,13 +236,70 @@ class BibliophileKnittingPattern:
         
     def reset_called_stitch_counts(self):
         self.called_stitch_counts = []
-    
-    def get_next_stitches(self, n_stitches: int, stitches_per_block=None, blocks_per_line=None):
         
-        if stitches_per_block is None:
-            stitches_per_block = self.stitches_per_block
-        if blocks_per_line is None:
-            blocks_per_line = self.blocks_per_line
+    def get_pattern_as_string(self):
+        return self.pattern
+    
+    def print_pattern(self):
+        print(self.pattern)
+        
+    def generate_pattern(self, 
+                         stitches_per_block=None, 
+                         blocks_per_line=None, 
+                         max_purl_run_len=None, 
+                         max_knit_run_len=None, 
+                         purl_run_spacer_char=None, 
+                         punctuation_mapping=None, 
+                         treat_zero_as_punctuation=None
+                         ):
+        """
+        Generate a knitting pattern from text
+        Rules for text:pattern translation are as outlined in the pattern
+        
+        Args:
+            stitches_per_block (int): Number of stitches per grouping in final pattern
+            blocks_per_line (int): Number of stitch blocks per line, separated by tabs
+            max_purl_run_len (int): Maximum length of purl run before inserting spacer
+            max_knit_run_len (int): Maximum length of knit run before shortening
+            purl_run_spacer_char (str): Character to insert between purl runs
+            punctuation_mapping (int): Number of knit stitches to use for punctuation
+            treat_zero_as_punctuation (bool): Treat 0 as punctuation (ie, translate it as 2 knits )
+        
+        """
+        
+        stitches_per_block = self.stitches_per_block if stitches_per_block is None else stitches_per_block
+        blocks_per_line = self.blocks_per_line if blocks_per_line is None else blocks_per_line
+        max_purl_run_len = self.max_purl_run_len if max_purl_run_len is None else max_purl_run_len
+        max_knit_run_len = self.max_knit_run_len if max_knit_run_len is None else max_knit_run_len
+        purl_run_spacer_char = self.purl_run_spacer_char if purl_run_spacer_char is None else purl_run_spacer_char
+        punctuation_mapping = self.punctuation_mapping if punctuation_mapping is None else punctuation_mapping
+        treat_zero_as_punctuation = self.treat_zero_as_punctuation if treat_zero_as_punctuation is None else treat_zero_as_punctuation
+        
+        pattern = text_to_knitting(self.stitches, 
+                                   stitches_per_block=stitches_per_block, 
+                                   blocks_per_line=blocks_per_line, 
+                                   max_purl_run_len=max_purl_run_len, 
+                                   max_knit_run_len=max_knit_run_len, 
+                                   purl_run_spacer_char=purl_run_spacer_char, 
+                                   punctuation_mapping=punctuation_mapping, 
+                                   treat_zero_as_punctuation=treat_zero_as_punctuation
+                                   )
+        return pattern
+    
+    def get_next_n_stitches(self, 
+                            n_stitches: int, 
+                            single_line: bool=False, 
+                            stitches_per_block=None, 
+                            blocks_per_line=None,
+                            ):
+                   
+        if single_line:
+            stitches_per_block = n_stitches
+            blocks_per_line = 1
+            
+        else:
+            stitches_per_block = self.stitches_per_block if stitches_per_block is None else stitches_per_block
+            blocks_per_line = self.blocks_per_line if blocks_per_line is None else blocks_per_line
         
         working_row = self.stitches[self.current_index:self.current_index+n_stitches]
         self.current_index += n_stitches
@@ -246,12 +311,29 @@ class BibliophileKnittingPattern:
                                         )
         return pattern
         
-    def get_next_several_sequences(self, 
-                                   stitch_counts: List[int], 
-                                   start_row_num: int=1, 
-                                   count_rows_by: int=2, 
-                                   seq_per_row: int=1
-                                   ):
+    def get_T_sequences(self, 
+                        stitch_counts: List[int], 
+                        start_row_num: int=1, 
+                        count_rows_by: int=2, 
+                        seq_per_row: int=1, 
+                        single_line: bool=True, 
+                        stitches_per_block: int=None,
+                        blocks_per_line: int=None, 
+                        ):
+        
+        """
+        Generate the next series of 'T' sequences in the pattern, given the expected stitch counts
+        
+        Args:
+            stitch_counts (List[int]): List of stitch counts for each sequence
+            start_row_num (int): Starting row number for the pattern
+            count_rows_by (int): Number of rows to count by
+            seq_per_row (int): Number of sequences to print per row
+            single_line (bool): Print each sequence on a single line when True, otherwise follow the blocking rules defined by stitches_per_block and blocks_per_line. When True, this will override the stitches_per_block and blocks_per_line arguments
+            stitches_per_block (int): Number of stitches per grouping in final pattern
+            blocks_per_line (int): Number of stitch blocks per line, separated by tabs
+    
+        """
         
         pattern = []
         seq_num = 0
@@ -263,12 +345,14 @@ class BibliophileKnittingPattern:
                 seq_num = 0
             
             pattern.append('\nT' + str(seq_num+1) + ': (' + str(stitch_counts[i]) + ') \n')
-            pattern.append(self.get_next_stitches(n_stitches=stitch_counts[i]))
+            pattern.append(self.get_next_n_stitches(n_stitches=stitch_counts[i], 
+                                                  single_line=single_line, 
+                                                  stitches_per_block=stitches_per_block, blocks_per_line=blocks_per_line
+                                                  ))
             pattern.append('\n')
             seq_num += 1    
             
         return ''.join(pattern)
-    
     
     
 if __name__ == '__main__':
